@@ -1,0 +1,103 @@
+#!/bin/bash
+
+# Define Colors
+BOLD="\e[1m"
+COL_TOP="\e[1;34m"    # Bold Blue for Top Headers
+COL_CHAIN="\e[1;32m"  # Bold Green for Chain Headers
+COL_RESET="\e[0m"
+
+# Default: use color. If -r is passed, we strip the color variables.
+USE_COLOR=true
+
+local_traffic=("RAW:PREROUTING" "MANGLE:PREROUTING" "NAT:PREROUTING" "MANGLE:INPUT" "NAT:INPUT" "FILTER:INPUT")
+transit_traffic=("RAW:PREROUTING" "MANGLE:PREROUTING" "NAT:PREROUTING" "MANGLE:FORWARD" "FILTER:FORWARD" "MANGLE:POSTROUTING" "NAT:POSTROUTING")
+generated_traffic=("RAW:OUTPUT" "MANGLE:OUTPUT" "NAT:OUTPUT" "FILTER:OUTPUT" "MANGLE:POSTROUTING" "NAT:POSTROUTING")
+
+print_top_header() {
+    local title=$1
+    if [ "$USE_COLOR" = true ]; then printf "${COL_TOP}"; fi
+    echo "=================================================================================="
+    echo "$title"
+    echo "=================================================================================="
+    if [ "$USE_COLOR" = true ]; then printf "${COL_RESET}"; fi
+    echo ""
+}
+
+print_rules() {
+    local table=$1
+    local chain=$2
+    local table_lower=$(echo "$table" | tr '[:upper:]' '[:lower:]')
+
+    local text="$table $chain "
+    local filler_len=$((60 - ${#text}))
+    local filler=$(printf '%*s' "$filler_len" | tr ' ' '=')
+
+    if [ "$USE_COLOR" = true ]; then printf "${COL_CHAIN}"; fi
+    echo "$text$filler"
+    if [ "$USE_COLOR" = true ]; then printf "${COL_RESET}"; fi
+
+    ip6tables -t "$table_lower" -S "$chain" 2>/dev/null
+    echo
+}
+
+print_custom_chains() {
+    print_top_header "CUSTOM CHAINS"
+    for table in filter nat mangle raw security; do
+        ip6tables -t "$table" -S 2>/dev/null | grep '^-N' | while read -r line; do
+            chain=$(echo "$line" | awk '{print $2}')
+            print_rules "$(echo "$table" | tr '[:lower:]' '[:upper:]')" "$chain"
+        done
+    done
+}
+
+print_local()     { print_top_header "LOCAL TRAFFIC"; for item in "${local_traffic[@]}"; do print_rules ${item%:*} ${item#*:}; done; }
+print_transit()   { print_top_header "TRANSIT TRAFFIC"; for item in "${transit_traffic[@]}"; do print_rules ${item%:*} ${item#*:}; done; }
+print_generated() { print_top_header "GENERATED TRAFFIC"; for item in "${generated_traffic[@]}"; do print_rules ${item%:*} ${item#*:}; done; }
+
+usage() {
+    echo "Usage: $0 [-l | -t | -g | -c | -a] [-r]"
+    echo "  -l  Local traffic"
+    echo "  -t  Transit traffic"
+    echo "  -g  Generated traffic"
+    echo "  -c  Custom chains"
+    echo "  -a  All modes"
+    echo "  -r  Raw output (no colors/formatting)"
+    echo "Hint: $0 -a | less -R"
+
+    # Ensure terminal is reset if usage is called
+    printf "${COL_RESET}"
+    exit 1
+}
+
+# Check for Raw flag anywhere in arguments
+for arg in "$@"; do
+    if [ "$arg" == "-r" ]; then
+        USE_COLOR=false
+        BOLD=""
+        COL_TOP=""
+        COL_CHAIN=""
+        COL_RESET=""
+    fi
+done
+
+# Check if no arguments or only -r was passed
+if [ $# -eq 0 ] || ([ $# -eq 1 ] && [ "$1" == "-r" ]); then
+    usage
+fi
+
+case "$1" in
+    -l) print_local ;;
+    -t) print_transit ;;
+    -g) print_generated ;;
+    -c) print_custom_chains ;;
+    -a)
+        print_local
+        print_transit
+        print_generated
+        print_custom_chains
+        ;;
+    *) usage ;;
+esac
+
+# Final safety reset
+printf "${COL_RESET}"
