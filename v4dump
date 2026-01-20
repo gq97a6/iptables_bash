@@ -4,6 +4,7 @@
 BOLD="\e[1m"
 COL_TOP="\e[1;34m"    # Bold Blue for Top Headers
 COL_CHAIN="\e[1;32m"  # Bold Green for Chain Headers
+COL_JUMP="\e[1;31m"   # Bold Red for Custom Jumps
 COL_RESET="\e[0m"
 
 # Default: use color. If -r is passed, we strip the color variables.
@@ -36,7 +37,25 @@ print_rules() {
     echo "$text$filler"
     if [ "$USE_COLOR" = true ]; then printf "${COL_RESET}"; fi
 
-    iptables -t "$table_lower" -S "$chain" 2>/dev/null
+    # Get list of custom chains to identify jumps
+    local custom_chains=$(iptables -t "$table_lower" -S | grep '^-N' | awk '{print $2}')
+    
+    iptables -t "$table_lower" -S "$chain" 2>/dev/null | while read -r line; do
+        local is_custom=false
+        # Check if the rule targets a custom chain
+        for cc in $custom_chains; do
+            if [[ "$line" == *"-j $cc"* ]]; then
+                is_custom=true
+                break
+            fi
+        done
+
+        if [ "$is_custom" = true ] && [ "$USE_COLOR" = true ]; then
+            echo -e "${COL_JUMP}${line}${COL_RESET}"
+        else
+            echo "$line"
+        fi
+    done
     echo
 }
 
@@ -63,23 +82,21 @@ usage() {
     echo "  -a  All modes"
     echo "  -r  Raw output (no colors/formatting)"
     echo "Hint: $0 -a | less -R"
-    # Ensure terminal is reset if usage is called
     printf "${COL_RESET}"
     exit 1
 }
 
-# Check for Raw flag anywhere in arguments
 for arg in "$@"; do
     if [ "$arg" == "-r" ]; then
         USE_COLOR=false
         BOLD=""
         COL_TOP=""
         COL_CHAIN=""
+        COL_JUMP=""
         COL_RESET=""
     fi
 done
 
-# Check if no arguments or only -r was passed
 if [ $# -eq 0 ] || ([ $# -eq 1 ] && [ "$1" == "-r" ]); then
     usage
 fi
@@ -98,5 +115,4 @@ case "$1" in
     *) usage ;;
 esac
 
-# Final safety reset
 printf "${COL_RESET}"
