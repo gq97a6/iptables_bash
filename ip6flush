@@ -1,4 +1,9 @@
-# IPv6 rules
+read -p "Press Y to continue: " confirm
+if [[ $confirm != [yY] ]]; then
+    exit 1
+fi
+
+#IPv6 rules
 ip6tables -F
 ip6tables -X
 

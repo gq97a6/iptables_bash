@@ -1,3 +1,9 @@
+read -p "Press Y to continue: " confirm
+if [[ $confirm != [yY] ]]; then
+    exit 1
+fi
+
+#IPv4 Rules
 iptables -F -t filter
 iptables -F -t nat
 iptables -F -t mangle
