@@ -1,0 +1,84 @@
+==================================================================================
+LOCAL TRAFFIC
+==================================================================================
+
+RAW PREROUTING =============================================
+-P PREROUTING ACCEPT
+
+MANGLE PREROUTING ==========================================
+-P PREROUTING ACCEPT
+
+NAT PREROUTING =============================================
+-P PREROUTING ACCEPT
+
+MANGLE INPUT ===============================================
+-P INPUT ACCEPT
+
+NAT INPUT ==================================================
+-P INPUT ACCEPT
+
+FILTER INPUT ===============================================
+-P INPUT DROP
+-A INPUT -j CROWDSEC_CHAIN
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p ipv6-icmp -j ACCEPT
+-A INPUT -p udp -m udp --dport 4242 -m comment --comment nebula -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 4242 -m comment --comment nebula -j ACCEPT
+
+==================================================================================
+TRANSIT TRAFFIC
+==================================================================================
+
+RAW PREROUTING =============================================
+-P PREROUTING ACCEPT
+
+MANGLE PREROUTING ==========================================
+-P PREROUTING ACCEPT
+
+NAT PREROUTING =============================================
+-P PREROUTING ACCEPT
+
+MANGLE FORWARD =============================================
+-P FORWARD ACCEPT
+
+FILTER FORWARD =============================================
+-P FORWARD DROP
+-A FORWARD -j CROWDSEC_CHAIN
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+MANGLE POSTROUTING =========================================
+-P POSTROUTING ACCEPT
+
+NAT POSTROUTING ============================================
+-P POSTROUTING ACCEPT
+
+==================================================================================
+GENERATED TRAFFIC
+==================================================================================
+
+RAW OUTPUT =================================================
+-P OUTPUT ACCEPT
+
+MANGLE OUTPUT ==============================================
+-P OUTPUT ACCEPT
+
+NAT OUTPUT =================================================
+-P OUTPUT ACCEPT
+
+FILTER OUTPUT ==============================================
+-P OUTPUT ACCEPT
+
+MANGLE POSTROUTING =========================================
+-P POSTROUTING ACCEPT
+
+NAT POSTROUTING ============================================
+-P POSTROUTING ACCEPT
+
+==================================================================================
+CUSTOM CHAINS
+==================================================================================
+
+FILTER CROWDSEC_CHAIN ======================================
+-N CROWDSEC_CHAIN
+
